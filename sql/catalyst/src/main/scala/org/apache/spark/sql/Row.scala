@@ -30,6 +30,7 @@ import org.json4s.JsonAST.JValue
 import org.json4s.jackson.JsonMethods._
 
 import org.apache.spark.annotation.{Stable, Unstable}
+import org.apache.spark.sql.api.{Row => RowAPI}
 import org.apache.spark.sql.catalyst.CatalystTypeConverters
 import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.catalyst.util.{DateFormatter, DateTimeUtils, TimestampFormatter}
@@ -140,7 +141,7 @@ object Row {
  * @since 1.3.0
  */
 @Stable
-trait Row extends Serializable {
+trait Row extends RowAPI with Serializable {
   /** Number of elements in the Row. */
   def size: Int = length
 
