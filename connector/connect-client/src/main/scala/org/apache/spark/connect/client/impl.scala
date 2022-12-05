@@ -22,21 +22,23 @@ import org.apache.spark.sql.api.{SparkSession => SparkSessionAPI}
 import org.apache.spark.sql.api.{Row => RowAPI}
 
 class SparkSession extends SparkSessionAPI {
-    override def range(n: Long): Dataset[Long] = new Dataset[Long](this)
+    override type DS[_] = Dataset[_]
+    override def range(n: Long): Dataset[java.lang.Long] = new Dataset[java.lang.Long](this)
     override def table(name: String): Dataset[Row] = new Dataset[Row](this)
 }
 
 class Column extends ColumnAPI {
     override type COL = Column
-    override def as(alias: String): COL = new Column
-    override def and(other: COL): COL = new Column
+    override def as(alias: String): Column = new Column
+    override def and(other: Column): Column = new Column
 }
 
-class Dataset[T](override val sparkSession: SparkSession) extends DatasetAPI[T] {
+class Dataset[T](override val sparkSession: SparkSession) extends DatasetAPI[SparkSession, T] {
     override type COL = Column
+    override type DS[_] = Dataset[_]
 
     override def as(alias: String): Dataset[T] = new Dataset[T](sparkSession)
-    override def select(cols: COL*): Dataset[Row] = new Dataset[Row](sparkSession)
+    override def select(cols: Column*): Dataset[Row] = new Dataset[Row](sparkSession)
 }
 
 class Row extends RowAPI {

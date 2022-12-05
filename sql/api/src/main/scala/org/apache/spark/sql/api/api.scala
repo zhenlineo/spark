@@ -16,31 +16,28 @@
  */
 package org.apache.spark.sql.api
 
+import scala.language.higherKinds
+
 trait SparkSession {
-
-    def range(n: Long): Dataset[java.lang.Long]
-
-    def table(name: String): Dataset[_ <: Row]
+    type DS[_] <: Dataset[_ >: this.type <: SparkSession, _]
+    def range(n: Long): DS[java.lang.Long]
+    def table(name: String): DS[_ <: Row]
 }
 
 trait Column {
-    // TODO figure out a way to tie this to the self type.
-    type COL <: Column
-
+    type COL >: this.type <: Column
     def as(alias: String): COL
-
     def and(other: COL): COL
 }
 
 
-trait Dataset[T] {
+trait Dataset[S <: SparkSession, T] {
     type COL <: Column
-
-    def sparkSession: SparkSession
-
-    def as(alias: String): Dataset[T]
-
-    def select(cols: COL*): Dataset[_ <: Row]
+//    type S <: SparkSession
+    type DS[_] >: this.type <: Dataset[S, _]
+    def sparkSession: S
+    def as(alias: String): DS[T]
+    def select(cols: COL*): DS[_ <: Row]
 }
 
 // A placeholder for the sql.Row class to test out shading.

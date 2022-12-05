@@ -89,6 +89,8 @@ class SparkSession private(
     @transient private[sql] val initialSessionOptions: Map[String, String])
   extends SparkSessionAPI with Serializable with Closeable with Logging { self =>
 
+  override type DS[_] = Dataset[_]
+
   // The call site where this SparkSession was constructed.
   private val creationSite: CallSite = Utils.getCallSite()
 

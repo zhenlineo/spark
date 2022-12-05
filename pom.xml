@@ -103,6 +103,7 @@
     <module>connector/avro</module>
     <module>connector/connect</module>
     <module>connector/connect-client</module>
+    <module>connector/connect-client-shaded</module>
     <module>connector/protobuf</module>
     <!-- See additional modules enabled by profiles below -->
   </modules>
