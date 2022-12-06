@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.connect.client
+package org.apache.spark.sql.connect.client
 
 import org.apache.spark.sql.api.{Column => ColumnAPI}
 import org.apache.spark.sql.api.{Dataset => DatasetAPI}

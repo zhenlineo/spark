@@ -42,8 +42,15 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.spark</groupId>
+      <artifactId>spark-api_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-connect-client_${scala.binary.version}</artifactId>
       <version>${project.version}</version>
+      <!-- Make sure we are using the shaded version -->
       <classifier>compatibility</classifier>
       <scope>test</scope>
     </dependency>
@@ -54,6 +61,20 @@
     </dependency>
     --><!-- #endif scala-2.13 -->
     <!--  Test dependencies  -->
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-core_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.scalacheck</groupId>
       <artifactId>scalacheck_${scala.binary.version}</artifactId>
