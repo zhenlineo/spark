@@ -21,7 +21,6 @@ import scala.collection.JavaConverters._
 
 import org.apache.spark.annotation.Stable
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.api.{Column => ColumnAPI}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder}
 import org.apache.spark.sql.catalyst.expressions._
@@ -140,9 +139,7 @@ class TypedColumn[-T, U](
  * @since 1.3.0
  */
 @Stable
-class Column(val expr: Expression) extends ColumnAPI with Logging {
-
-  override type COL = Column
+class Column(val expr: Expression) extends Logging {
 
   def this(name: String) = this(name match {
     case "*" => UnresolvedStar(None)
@@ -642,7 +639,7 @@ class Column(val expr: Expression) extends ColumnAPI with Logging {
    * @group java_expr_ops
    * @since 1.3.0
    */
-  override def and(other: Column): Column = this && other
+  def and(other: Column): Column = this && other
 
   /**
    * Sum of this expression and another expression.
@@ -1089,7 +1086,7 @@ class Column(val expr: Expression) extends ColumnAPI with Logging {
    * @group expr_ops
    * @since 1.3.0
    */
-  override def as(alias: String): Column = name(alias)
+  def as(alias: String): Column = name(alias)
 
   /**
    * (Scala-specific) Assigns the given aliases to the results of a table generating function.

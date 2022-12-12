@@ -14,23 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.connect
+package org.apache.spark.sql
 
-import java.lang
-
-import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.{Column, Dataset, SparkSession}
-import org.apache.spark.sql.api.{SparkSession => SparkSessionAPI}
-
-class APITestSuite extends SparkFunSuite {
-    test("compatibility API tests") {
-        val session: SparkSession = new SparkSession()
-        val ds : Dataset[java.lang.Long] = session.range(10)
-        ds.select(new Column().as("col"))
-    }
-
-    test("API tests") {
-        val session: SparkSessionAPI = new SparkSession()
-        val ds: session.DS[lang.Long] = session.range(10)
-    }
+package object api {
+    private[sql] type DataFrame = Dataset[Row]
 }
+

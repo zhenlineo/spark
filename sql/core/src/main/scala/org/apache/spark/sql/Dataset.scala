@@ -190,10 +190,10 @@ private[sql] object Dataset {
 class Dataset[T] private[sql](
     @DeveloperApi @Unstable @transient val queryExecution: QueryExecution,
     @DeveloperApi @Unstable @transient val encoder: Encoder[T])
-  extends DatasetAPI[SparkSession, T] with Serializable {
+  extends Serializable {
 
-  override type COL = Column
-  override type DS[_] = Dataset[_]
+  override private[sql] def myMethod(cols: Column*): Dataset[_] =
+    throw new UnsupportedOperationException
 
   @transient lazy val sparkSession: SparkSession = {
     if (queryExecution == null || queryExecution.sparkSession == null) {
@@ -1525,7 +1525,7 @@ class Dataset[T] private[sql](
    * @group typedrel
    * @since 1.6.0
    */
-  override def as(alias: String): Dataset[T] = withTypedPlan {
+  def as(alias: String): Dataset[T] = withTypedPlan {
     SubqueryAlias(alias, logicalPlan)
   }
 
@@ -1563,7 +1563,7 @@ class Dataset[T] private[sql](
    * @since 2.0.0
    */
   @scala.annotation.varargs
-  override def select(cols: Column*): DataFrame = withPlan {
+  def select(cols: Column*): DataFrame = withPlan {
     val untypedCols = cols.map {
       case typedCol: TypedColumn[_, _] =>
         // Checks if a `TypedColumn` has been inserted with

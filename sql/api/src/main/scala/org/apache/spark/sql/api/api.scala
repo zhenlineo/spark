@@ -16,30 +16,24 @@
  */
 package org.apache.spark.sql.api
 
-import scala.language.higherKinds
-
-trait SparkSession {
-    type DS[_] <: Dataset[_ >: this.type <: SparkSession, _]
-    def range(n: Long): DS[java.lang.Long]
-    def table(name: String): DS[_ <: Row]
+private[sql] trait SparkSession {
+    def range(n: Long): Dataset[java.lang.Long]
+    def table(name: String): Dataset[_ <: Row]
 }
 
-trait Column {
-    type COL >: this.type <: Column
-    def as(alias: String): COL
-    def and(other: COL): COL
+private[sql] trait Column {
+    def as(alias: String): Column
+    def and(other: Column): Column
 }
 
 
-trait Dataset[S <: SparkSession, T] {
-    type COL <: Column
-//    type S <: SparkSession
-    type DS[_] >: this.type <: Dataset[S, _]
-    def sparkSession: S
-    def as(alias: String): DS[T]
-    def select(cols: COL*): DS[_ <: Row]
+private[sql] trait Dataset[T] {
+    def sparkSession: SparkSession
+    def as(alias: String): Dataset[T]
+    def select(cols: Column*): Dataset[_ <: Row]
+    private[sql] def myMethod(cols: Column*): Dataset[_ <: Row]
 }
 
-// A placeholder for the sql.Row class to test out shading.
-trait Row {
+// A placeholder for the sql.Row class until it is refactored out.
+private[sql] trait Row {
 }
