@@ -446,7 +446,8 @@ object SparkBuild extends PomBuild {
 
   enable(SparkConnectCommon.settings)(connectCommon)
   enable(SparkConnect.settings)(connect)
-  enable(SparkConnectClient.settings)(connectClient)
+//  enable(SparkConnectClient.settings)(connectClient)
+  enable(SparkConnectClientCompatibility.settings)(connectClient)
 
   /* Protobuf settings */
   enable(SparkProtobuf.settings)(protobuf)
@@ -881,6 +882,61 @@ object SparkConnectClient {
       )
     )
   }
+}
+
+object SparkConnectClientCompatibility {
+  val clientModule = "spark-connect-client"
+  lazy val settings = Seq(
+    libraryDependencies += "org.apache.spark" % clientModule % version.value % "assembly",
+    (assembly / assemblyJarName) := s"$clientModule-compatibility-${version.value}.jar",
+  )
+//  import BuildCommons.protoVersion
+//
+//  lazy val settings = Seq(
+//    libraryDependencies ++= {
+//      Seq(
+//        "com.google.protobuf" % "protobuf-java" % protoVersion % "protobuf"
+//      )
+//    },
+//
+//    dependencyOverrides ++= {
+//      Seq(
+//        "com.google.protobuf" % "protobuf-java" % protoVersion
+//      )
+//    },
+//
+//    (assembly / assemblyJarName) := s"${moduleName.value}-compatibility-${version.value}.jar",
+//
+//    (assembly / test) := { },
+//
+//    (assembly / logLevel) := Level.Info,
+//
+//    // Exclude `scala-library` from assembly.
+//    (assembly / assemblyPackageScala / assembleArtifact) := false,
+//
+//    // Exclude `pmml-model-*.jar`, `scala-collection-compat_*.jar`,`jsr305-*.jar` and
+//    // `netty-*.jar` and `unused-1.0.0.jar` from assembly.
+//    (assembly / assemblyExcludedJars) := {
+//      val cp = (assembly / fullClasspath).value
+//      cp filter { v =>
+//        val name = v.data.getName
+//        name.startsWith("pmml-model-") || name.startsWith("scala-collection-compat_") ||
+//          name.startsWith("jsr305-") || name.startsWith("netty-") || name == "unused-1.0.0.jar"
+//      }
+//    },
+//
+//    (assembly / assemblyShadeRules) := Seq(
+//      ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.connect.protobuf.@1").inAll,
+//      ShadeRule.rename("org.apache.spark.sql.connect.client.**" -> "org.apache.spark.sql.@1").inAll,
+//    ),
+//
+//    (assembly / assemblyMergeStrategy) := {
+//      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+//      // Drop all proto files that are not needed as artifacts of the build.
+//      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
+//      case _ => MergeStrategy.first
+//    }
+//  )
 }
 
 object SparkProtobuf {
