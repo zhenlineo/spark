@@ -21,12 +21,12 @@ import java.util.concurrent.TimeUnit
 
 import scala.io.Source
 
-import org.scalatest.Assertions.fail
 import org.scalatest.BeforeAndAfterAll
 import sys.process._
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.connect.client.SparkConnectClient
+import org.apache.spark.sql.connect.client.util.TestUtils._
 import org.apache.spark.sql.connect.common.config.ConnectCommon
 
 /**
@@ -45,22 +45,6 @@ import org.apache.spark.sql.connect.common.config.ConnectCommon
  * print the server process output in the console to debug server start stop problems.
  */
 object SparkConnectServerUtils {
-  // System properties used for testing and debugging
-  private val DEBUG_SC_JVM_CLIENT = "spark.debug.sc.jvm.client"
-
-  protected lazy val sparkHome: String = {
-    if (!(sys.props.contains("spark.test.home") || sys.env.contains("SPARK_HOME"))) {
-      fail("spark.test.home or SPARK_HOME is not set.")
-    }
-    sys.props.getOrElse("spark.test.home", sys.env("SPARK_HOME"))
-  }
-  private val isDebug = System.getProperty(DEBUG_SC_JVM_CLIENT, "false").toBoolean
-
-  // Log server start stop debug info into console
-  // scalastyle:off println
-  private[connect] def debug(msg: String): Unit = if (isDebug) println(msg)
-  // scalastyle:on println
-  private[connect] def debug(error: Throwable): Unit = if (isDebug) error.printStackTrace()
 
   // Server port
   private[connect] val port = ConnectCommon.CONNECT_GRPC_BINDING_PORT + util.Random.nextInt(1000)
@@ -69,7 +53,10 @@ object SparkConnectServerUtils {
 
   private lazy val sparkConnect: Process = {
     debug("Starting the Spark Connect Server...")
-    val jar = findSparkConnectJar
+    val jar = findJar(
+      "connector/connect/server",
+      "spark-connect-assembly",
+      "spark-connect").getCanonicalPath
     val builder = Process(
       new File(sparkHome, "bin/spark-shell").getCanonicalPath,
       Seq(
@@ -107,36 +94,6 @@ object SparkConnectServerUtils {
     val code = sparkConnect.exitValue()
     debug(s"Spark Connect Server is stopped with exit code: $code")
     code
-  }
-
-  private def findSparkConnectJar: String = {
-    val target = "connector/connect/server/target"
-    val parentDir = new File(sparkHome, target)
-    assert(
-      parentDir.exists(),
-      s"Fail to locate the spark connect server target folder: '${parentDir.getCanonicalPath}'. " +
-        s"SPARK_HOME='${new File(sparkHome).getCanonicalPath}'. " +
-        "Make sure the spark connect server jar has been built " +
-        "and the env variable `SPARK_HOME` is set correctly.")
-    val jars = recursiveListFiles(parentDir).filter { f =>
-      // SBT jar
-      (f.getParentFile.getName.startsWith("scala-") &&
-        f.getName.startsWith("spark-connect-assembly") && f.getName.endsWith(".jar")) ||
-      // Maven Jar
-      (f.getParent.endsWith("target") &&
-        f.getName.startsWith("spark-connect") && f.getName.endsWith(".jar"))
-    }
-    // It is possible we found more than one: one built by maven, and another by SBT
-    assert(
-      jars.nonEmpty,
-      s"Failed to find the `spark-connect` jar inside folder: ${parentDir.getCanonicalPath}")
-    debug("Using jar: " + jars(0).getCanonicalPath)
-    jars(0).getCanonicalPath // return the first one
-  }
-
-  def recursiveListFiles(f: File): Array[File] = {
-    val these = f.listFiles
-    these ++ these.filter(_.isDirectory).flatMap(recursiveListFiles)
   }
 }
 
