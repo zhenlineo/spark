@@ -16,14 +16,21 @@
  */
 package org.apache.spark.sql
 
-import scala.reflect.ClassTag
+class SparkSession {
+  def range(n: Long): Dataset[java.lang.Long] = new Dataset[java.lang.Long](this)
+  def table(name: String): DataFrame = new Dataset[Row](this)
 
-// Placeholder to test the compatibility
-class Dataset[T] {
-  def collect[T: ClassTag](): Array[T] = new Array[T](0)
-
-  // Used in tests to verify the class loaded is correct.
-  private[sql] def version(): String = "Spark Connect JVM Client"
+  private[sql] def version: String = "Spark Connect JVM Client"
 }
 
-object Dataset {}
+class Column {
+  def as(alias: String): Column = new Column
+  def and(other: Column): Column = new Column
+}
+
+class Dataset[T](val sparkSession: SparkSession) {
+  def as[U: Encoder]: Dataset[U] = new Dataset[U](sparkSession)
+  def select(cols: Column*): DataFrame = new Dataset[Row](sparkSession)
+
+  private[sql] def version: String = "Spark Connect JVM Client"
+}

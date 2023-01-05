@@ -14,18 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql
 
-import org.scalatest.funsuite.AnyFunSuite // scalastyle:ignore funsuite
+package org.apache.spark
 
-class ClassLoadingSuite extends AnyFunSuite { // scalastyle:ignore funsuite
-  test("test loading the correct Dataset class") {
-    val ds = new Dataset[Int](null)
-    assert(ds.version.contains("Spark Connect JVM Client"))
-  }
-
-  test("test loading the correct SparkSession class") {
-    val session = new SparkSession()
-    assert(session.version.contains("Spark Connect JVM Client"))
-  }
+package object sql {
+  type DataFrame = Dataset[Row]
 }
