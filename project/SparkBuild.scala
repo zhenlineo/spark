@@ -52,16 +52,16 @@ object BuildCommons {
   val streamingProjects@Seq(streaming, streamingKafka010) =
     Seq("streaming", "streaming-kafka-0-10").map(ProjectRef(buildLocation, _))
 
-  val connectProjects@Seq(connectCommon, connect, connectClient, connectClientTest) = Seq(
-    "connect-common", "connect", "connect-client-jvm", "connect-client-jvm-compatibility-test"
-  ).map(ProjectRef(buildLocation, _))
+  val connectCommon = ProjectRef(buildLocation, "connect-common")
+  val connect = ProjectRef(buildLocation, "connect")
+  val connectClient = ProjectRef(buildLocation, "connect-client-jvm")
 
   val allProjects@Seq(
     core, graphx, mllib, mllibLocal, repl, networkCommon, networkShuffle, launcher, unsafe, tags, sketch, kvstore, _*
   ) = Seq(
     "core", "graphx", "mllib", "mllib-local", "repl", "network-common", "network-shuffle", "launcher", "unsafe",
     "tags", "sketch", "kvstore"
-  ).map(ProjectRef(buildLocation, _)) ++ sqlProjects ++ streamingProjects ++ connectProjects
+  ).map(ProjectRef(buildLocation, _)) ++ sqlProjects ++ streamingProjects ++ Seq(connectCommon, connect, connectClient)
 
   val optionallyEnabledProjects@Seq(kubernetes, mesos, yarn,
     sparkGangliaLgpl, streamingKinesisAsl,
@@ -403,14 +403,16 @@ object SparkBuild extends PomBuild {
   val mimaProjects = allProjects.filterNot { x =>
     Seq(
       spark, hive, hiveThriftServer, repl, networkCommon, networkShuffle, networkYarn,
-      unsafe, tags, tokenProviderKafka010, sqlKafka010, connectCommon, connect, connectClient,
-        connectClientTest, protobuf
+      unsafe, tags, tokenProviderKafka010, sqlKafka010, connectCommon, connect, connectClient, protobuf
     ).contains(x)
   }
 
   mimaProjects.foreach { x =>
     enable(MimaBuild.mimaSettings(sparkHome, x))(x)
   }
+
+  // Add MiMa check for connect client
+  enable(ClientMimaBuild.mimaSettings)(connectClient)
 
   /* Generate and pick the spark build info from extra-resources */
   enable(Core.settings)(core)
@@ -1390,12 +1392,10 @@ object Unidoc {
 
     (ScalaUnidoc / unidoc / unidocProjectFilter) :=
       inAnyProject -- inProjects(OldDeps.project, repl, examples, tools, kubernetes,
-        yarn, tags, streamingKafka010, sqlKafka010, connectCommon, connect, connectClient,
-        connectClientTest, protobuf),
+        yarn, tags, streamingKafka010, sqlKafka010, connectCommon, connect, connectClient, protobuf),
     (JavaUnidoc / unidoc / unidocProjectFilter) :=
       inAnyProject -- inProjects(OldDeps.project, repl, examples, tools, kubernetes,
-        yarn, tags, streamingKafka010, sqlKafka010, connectCommon, connect, connectClient,
-        connectClientTest, protobuf),
+        yarn, tags, streamingKafka010, sqlKafka010, connectCommon, connect, connectClient, protobuf),
 
     (ScalaUnidoc / unidoc / unidocAllClasspaths) := {
       ignoreClasspaths((ScalaUnidoc / unidoc / unidocAllClasspaths).value)
