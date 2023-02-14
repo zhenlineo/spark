@@ -50,15 +50,13 @@ class ClientE2ETestSuite extends RemoteSparkSession {
   }
 
   test("simple udf test") {
-
-    def dummyUdf(x: Int): Int = x + 5
-    val myUdf = udf(dummyUdf _)
+    val myUdf = udf(TestUDFs.udf5)
     val df = spark.range(5).select(myUdf(Column("id")))
 
     val result = df.collectResult()
     assert(result.length == 5)
     result.toArray.zipWithIndex.foreach { case (v, idx) =>
-      assert(v.getInt(0) == idx + 5)
+      assert(v.getLong(0) == idx)
     }
   }
 
