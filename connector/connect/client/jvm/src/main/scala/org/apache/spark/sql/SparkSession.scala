@@ -135,6 +135,7 @@ class SparkSession(private val client: SparkConnectClient, private val cleaner: 
 
   override def close(): Unit = {
     client.shutdown()
+    cleaner.forceCleanUp()
     allocator.close()
   }
 }

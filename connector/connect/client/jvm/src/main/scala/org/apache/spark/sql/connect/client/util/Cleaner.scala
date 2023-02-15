@@ -75,6 +75,21 @@ private[sql] class Cleaner {
     cleanerThread.interrupt()
   }
 
+  // Stop the background auto cleanup and force to release all resources.
+  def forceCleanUp(): Unit = {
+    stop()
+    referenceBuffer.forEach(ref => {
+      try {
+        ref.close()
+      } catch {
+        case NonFatal(e) =>
+          // TODO: Log error
+          e.printStackTrace()
+      }
+    })
+    referenceBuffer.clear()
+  }
+
   private def cleanUp(): Unit = {
     while (!stopped) {
       try {
@@ -82,8 +97,9 @@ private[sql] class Cleaner {
         referenceBuffer.remove(ref)
         ref.close()
       } catch {
+        case _: InterruptedException => // ignored TODO: log debug
         case NonFatal(e) =>
-          // Perhaps log this?
+          // TODO: Log error
           e.printStackTrace()
       }
     }
