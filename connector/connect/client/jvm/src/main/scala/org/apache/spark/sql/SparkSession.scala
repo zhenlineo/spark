@@ -23,7 +23,7 @@ import org.apache.arrow.memory.RootAllocator
 import org.apache.spark.connect.proto
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.connect.client.{SparkConnectClient, SparkResult}
-import org.apache.spark.sql.connect.client.util.Cleaner
+import org.apache.spark.sql.connect.client.util.{Cleaner, CleanerThread}
 
 /**
  * The entry point to programming Spark with the Dataset and DataFrame API.
@@ -45,10 +45,13 @@ import org.apache.spark.sql.connect.client.util.Cleaner
  *     .getOrCreate()
  * }}}
  */
-class SparkSession(private val client: SparkConnectClient, private val cleaner: Cleaner)
+class SparkSession(private val client: SparkConnectClient, private val cleanerThread: CleanerThread)
     extends Serializable
     with Closeable
     with Logging {
+
+  private val cleaner: Cleaner = new Cleaner
+  cleanerThread.register(this, cleaner)
 
   private[this] val allocator = new RootAllocator()
 
@@ -135,7 +138,7 @@ class SparkSession(private val client: SparkConnectClient, private val cleaner: 
 
   override def close(): Unit = {
     client.shutdown()
-    cleaner.forceCleanUp()
+    cleanerThread.unregister(this)
     allocator.close()
   }
 }
@@ -146,7 +149,7 @@ object SparkSession extends Logging {
   def builder(): Builder = new Builder()
 
   private lazy val cleaner = {
-    val cleaner = new Cleaner
+    val cleaner = new CleanerThread
     cleaner.start()
     cleaner
   }

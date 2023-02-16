@@ -23,13 +23,59 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
+private[sql] class CleanerThread {
+  @volatile private var stopped = false
+
+  private val cleaners = new ConcurrentHashMap[AnyRef, Cleaner]
+
+  private val cleanerThread = {
+    val thread = new Thread(() => cleanUp())
+    thread.setName("cleaner")
+    thread.setDaemon(true)
+    thread
+  }
+
+  def register(group: AnyRef, cleaner: Cleaner): Unit = {
+    cleaners.put(group, cleaner)
+  }
+
+  def unregister(group: AnyRef): Unit = {
+    val cleaner = cleaners.remove(group)
+    cleaner.close()
+  }
+
+  def start(): Unit = {
+    require(!stopped)
+    cleanerThread.start()
+  }
+
+  def stop(): Unit = {
+    stopped = true
+    cleanerThread.interrupt()
+  }
+
+  private def cleanUp(): Unit = {
+    while (!stopped) {
+      cleaners.forEach((_, cleaner) => {
+        try {
+          cleaner.cleanUp()
+        } catch {
+          case NonFatal(e) =>
+            // TODO: Log error
+            e.printStackTrace()
+        }
+      })
+    }
+  }
+}
+
 /**
  * Helper class for cleaning up an object's resources after the object itself has been garbage
  * collected.
  *
  * When we move to Java 9+ we should replace this class by [[java.lang.ref.Cleaner]].
  */
-private[sql] class Cleaner {
+private[sql] class Cleaner extends AutoCloseable{
   class Ref(pin: AnyRef, val resource: AutoCloseable)
       extends WeakReference[AnyRef](pin, referenceQueue)
       with AutoCloseable {
@@ -54,30 +100,11 @@ private[sql] class Cleaner {
     referenceBuffer.add(new Ref(pin, resource))
   }
 
-  @volatile private var stopped = false
   private val referenceBuffer = Collections.newSetFromMap[Ref](new ConcurrentHashMap)
   private val referenceQueue = new ReferenceQueue[AnyRef]
 
-  private val cleanerThread = {
-    val thread = new Thread(() => cleanUp())
-    thread.setName("cleaner")
-    thread.setDaemon(true)
-    thread
-  }
-
-  def start(): Unit = {
-    require(!stopped)
-    cleanerThread.start()
-  }
-
-  def stop(): Unit = {
-    stopped = true
-    cleanerThread.interrupt()
-  }
-
-  // Stop the background auto cleanup and force to release all resources.
-  def forceCleanUp(): Unit = {
-    stop()
+  // Clean up all without waiting for resource reference being released.
+  override def close(): Unit = {
     referenceBuffer.forEach(ref => {
       try {
         ref.close()
@@ -90,18 +117,16 @@ private[sql] class Cleaner {
     referenceBuffer.clear()
   }
 
-  private def cleanUp(): Unit = {
-    while (!stopped) {
-      try {
-        val ref = referenceQueue.remove().asInstanceOf[Ref]
-        referenceBuffer.remove(ref)
-        ref.close()
-      } catch {
-        case _: InterruptedException => // ignored TODO: log debug
-        case NonFatal(e) =>
-          // TODO: Log error
-          e.printStackTrace()
-      }
+  // Clean up the buffers when each resource is not referenced.
+  def cleanUp(): Unit = {
+    try {
+      val ref = referenceQueue.remove().asInstanceOf[Ref]
+      referenceBuffer.remove(ref)
+      ref.close()
+    } catch {
+      case NonFatal(e) =>
+        // TODO: Log error
+        e.printStackTrace()
     }
   }
 }
