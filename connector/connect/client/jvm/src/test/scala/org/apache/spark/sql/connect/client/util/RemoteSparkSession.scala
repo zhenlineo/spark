@@ -62,21 +62,27 @@ object SparkConnectServerUtils {
       "connector/connect/server",
       "spark-connect-assembly",
       "spark-connect").getCanonicalPath
+    val testJar = "/Users/zhen.li/code/spark-sbt/connector/connect/client/jvm/target/spark-connect-client-jvm_2.12-3.5.0-SNAPSHOT-tests.jar"
     val builder = Process(
       Seq(
         "bin/spark-submit",
         "--driver-class-path",
         jar,
+        "--jars",
+        testJar,
         "--conf",
         s"spark.connect.grpc.binding.port=$port",
-        "--conf",
-        "spark.sql.catalog.testcat=org.apache.spark.sql.connect.catalog.InMemoryTableCatalog",
-        "--conf",
-        "spark.sql.catalogImplementation=hive",
+//        "--conf",
+//        "spark.sql.catalog.testcat=org.apache.spark.sql.connect.catalog.InMemoryTableCatalog",
+//        "--conf",
+//        "spark.sql.catalogImplementation=hive",
         "--class",
         "org.apache.spark.sql.connect.SimpleSparkConnectService",
         jar),
-      new File(sparkHome))
+      new File(sparkHome),
+//      "SPARK_USER_CLASSPATH" -> testJar
+//        System.getProperty("java.class.path")
+    )
 
     val io = new ProcessIO(
       in => consoleOut = new BufferedOutputStream(in),

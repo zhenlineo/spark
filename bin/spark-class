@@ -55,6 +55,14 @@ if [ -n "$SPARK_PREPEND_CLASSES" ]; then
   LAUNCH_CLASSPATH="${SPARK_HOME}/launcher/target/scala-$SPARK_SCALA_VERSION/classes:$LAUNCH_CLASSPATH"
 fi
 
+# Add the user classpath into spark launch classpath if specified.
+if [ -n "$SPARK_USER_CLASSPATH" ]; then
+  LAUNCH_CLASSPATH="$LAUNCH_CLASSPATH:$SPARK_USER_CLASSPATH"
+fi
+
+echo "$LAUNCH_CLASSPATH"
+
+
 # For tests
 if [[ -n "$SPARK_TESTING" ]]; then
   unset YARN_CONF_DIR

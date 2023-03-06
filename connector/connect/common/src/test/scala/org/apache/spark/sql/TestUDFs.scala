@@ -40,4 +40,6 @@ object TestUDFs {
   val udf4: (L, L, L, L) => (L, L, L, L) = new ((L, L, L, L) => (L, L, L, L)) with Serializable {
     override def apply(i0: L, i1: L, i2: L, i3: L): (L, L, L, L) = (i0, i1, i2, i3)
   }
+
+  def udf5(x: Int): Int = x + 5
 }
