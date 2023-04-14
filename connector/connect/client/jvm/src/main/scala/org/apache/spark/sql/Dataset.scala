@@ -1290,6 +1290,7 @@ class Dataset[T] private[sql] (
       kEncoder,
       kEncoder,
       func,
+      encoder,
       UdfUtils.identical())
   }
 

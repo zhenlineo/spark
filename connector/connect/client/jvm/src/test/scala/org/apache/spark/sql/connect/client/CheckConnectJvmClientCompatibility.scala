@@ -186,11 +186,6 @@ object CheckConnectJvmClientCompatibility {
       ProblemFilters.exclude[Problem](
         "org.apache.spark.sql.KeyValueGroupedDataset.queryExecution"),
       ProblemFilters.exclude[Problem]("org.apache.spark.sql.KeyValueGroupedDataset.reduceGroups"),
-      ProblemFilters.exclude[Problem]("org.apache.spark.sql.KeyValueGroupedDataset.agg"),
-      ProblemFilters.exclude[Problem](
-        "org.apache.spark.sql.KeyValueGroupedDataset.aggUntyped"
-      ), // protected internal
-      ProblemFilters.exclude[Problem]("org.apache.spark.sql.KeyValueGroupedDataset.count"),
       ProblemFilters.exclude[Problem]("org.apache.spark.sql.KeyValueGroupedDataset.this"),
 
       // RelationalGroupedDataset
