@@ -94,5 +94,9 @@ private[sql] object UdfUtils {
       }
   }
 
+  def mapReduceFuncToScalaFunc[T](func: ReduceFunction[T]): (T, T) => T = func.call
+
+  def groupAllUnderBoolTrue[T](): T => Boolean = _ => true
+
   def identical[T](): T => T = t => t
 }
