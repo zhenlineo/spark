@@ -1242,7 +1242,7 @@ class Dataset[T] private[sql] (
   def groupBy(cols: Column*): RelationalGroupedDataset = {
     new RelationalGroupedDataset(
       toDF(),
-      cols.map(_.expr),
+      cols,
       proto.Aggregate.GroupType.GROUP_TYPE_GROUPBY)
   }
 
@@ -1271,7 +1271,7 @@ class Dataset[T] private[sql] (
     val colNames: Seq[String] = col1 +: cols
     new RelationalGroupedDataset(
       toDF(),
-      colNames.map(colName => Column(colName).expr),
+      colNames.map(colName => Column(colName)),
       proto.Aggregate.GroupType.GROUP_TYPE_GROUPBY)
   }
 
@@ -1309,15 +1309,12 @@ class Dataset[T] private[sql] (
    */
   def groupByKey[K: Encoder](func: T => K): KeyValueGroupedDataset[K, T] = {
     val kEncoder = encoderFor[K]
-    new KeyValueGroupedDatasetImpl[K, T, K, T](
+    KeyValueGroupedDatasetImpl[K, T](
       this,
       sparkSession,
       plan,
       kEncoder,
-      kEncoder,
-      func,
-      encoder,
-      UdfUtils.identical())
+      func)
   }
 
   /**
@@ -1353,7 +1350,7 @@ class Dataset[T] private[sql] (
   def rollup(cols: Column*): RelationalGroupedDataset = {
     new RelationalGroupedDataset(
       toDF(),
-      cols.map(_.expr),
+      cols,
       proto.Aggregate.GroupType.GROUP_TYPE_ROLLUP)
   }
 
@@ -1384,7 +1381,7 @@ class Dataset[T] private[sql] (
     val colNames: Seq[String] = col1 +: cols
     new RelationalGroupedDataset(
       toDF(),
-      colNames.map(colName => Column(colName).expr),
+      colNames.map(colName => Column(colName)),
       proto.Aggregate.GroupType.GROUP_TYPE_ROLLUP)
   }
 
@@ -1411,7 +1408,7 @@ class Dataset[T] private[sql] (
   def cube(cols: Column*): RelationalGroupedDataset = {
     new RelationalGroupedDataset(
       toDF(),
-      cols.map(_.expr),
+      cols,
       proto.Aggregate.GroupType.GROUP_TYPE_CUBE)
   }
 
@@ -1441,7 +1438,7 @@ class Dataset[T] private[sql] (
     val colNames: Seq[String] = col1 +: cols
     new RelationalGroupedDataset(
       toDF(),
-      colNames.map(colName => Column(colName).expr),
+      colNames.map(colName => Column(colName)),
       proto.Aggregate.GroupType.GROUP_TYPE_CUBE)
   }
 
