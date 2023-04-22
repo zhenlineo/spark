@@ -675,6 +675,55 @@ class SparkConnectPlanner(val session: SparkSession) {
         groupingExprs: java.util.List[proto.Expression],
         sortingExprs: java.util.List[proto.Expression]): UntypedKeyValueGroupedDataset = {
       val logicalPlan = transformRelation(input)
+      createFromGroupingFunc(logicalPlan, groupingExprs, sortingExprs)
+    }
+
+    def createFromGroupingExprs(
+        logicalPlan: LogicalPlan,
+        groupingExprs: java.util.List[proto.Expression],
+        sortingExprs: java.util.List[proto.Expression]): UntypedKeyValueGroupedDataset = {
+      assert(groupingExprs.size() >= 1)
+      val groupExprs = groupingExprs.asScala.toSeq.map(expr => transformExpression(expr))
+
+
+      val vEnc = ExpressionEncoder(groupFunc.inputEncoders.head)
+      val kEnc = ExpressionEncoder(groupFunc.outputEncoder)
+
+      val withGroupingKey = new AppendColumns(
+        groupFunc.function.asInstanceOf[Any => Any],
+        vEnc.clsTag.runtimeClass,
+        vEnc.schema,
+        UnresolvedDeserializer(vEnc.deserializer),
+        kEnc.namedExpressions,
+        logicalPlan)
+
+      // Compute sort order
+      val sortExprs =
+        sortingExprs.asScala.toSeq.map(expr => transformExpression(expr))
+      val sortOrder: Seq[SortOrder] = sortExprs.map {
+        case expr: SortOrder => expr
+        case expr: Expression => SortOrder(expr, Ascending)
+      }
+
+      // The input logical plan of KeyValueGroupedDataset need to be executed and analyzed
+      val analyzed = session.sessionState.executePlan(withGroupingKey).analyzed
+      val dataAttributes = logicalPlan.output
+      val groupingAttributes = withGroupingKey.newColumns
+      val valueDeserializer = UnresolvedDeserializer(vEnc.deserializer, dataAttributes)
+      UntypedKeyValueGroupedDataset(
+        kEnc,
+        vEnc,
+        valueDeserializer,
+        analyzed,
+        dataAttributes,
+        groupingAttributes,
+        sortOrder)
+    }
+
+    def createFromGroupingFunc(
+        logicalPlan: LogicalPlan,
+        groupingExprs: java.util.List[proto.Expression],
+        sortingExprs: java.util.List[proto.Expression]): UntypedKeyValueGroupedDataset = {
       assert(groupingExprs.size() == 1)
       val groupFunc = groupingExprs.asScala.toSeq
         .map(expr => unpackUdf(expr.getCommonInlineUserDefinedFunction))
@@ -714,6 +763,8 @@ class SparkConnectPlanner(val session: SparkSession) {
         groupingAttributes,
         sortOrder)
     }
+
+    def create()
   }
 
   /**
