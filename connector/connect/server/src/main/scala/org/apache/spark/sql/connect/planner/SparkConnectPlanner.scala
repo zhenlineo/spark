@@ -530,7 +530,7 @@ class SparkConnectPlanner(val session: SparkSession) {
   private def transformTypedMapPartitions(
       fun: proto.CommonInlineUserDefinedFunction,
       child: LogicalPlan): LogicalPlan = {
-    val udf = ScalaUdf(fun)
+    val udf = TypedScalaUdf(fun)
     val deserialized = DeserializeToObject(udf.inputDeserializer(), udf.inputObjAttr, child)
     val mapped = MapPartitions(
       udf.function.asInstanceOf[Iterator[Any] => Iterator[Any]],
@@ -566,7 +566,7 @@ class SparkConnectPlanner(val session: SparkSession) {
   private def transformTypedGroupMap(
       rel: proto.GroupMap,
       commonUdf: proto.CommonInlineUserDefinedFunction): LogicalPlan = {
-    val udf = ScalaUdf(commonUdf)
+    val udf = TypedScalaUdf(commonUdf)
     val ds = UntypedKeyValueGroupedDataset(
       rel.getInput,
       rel.getGroupingExpressionsList,
@@ -618,7 +618,7 @@ class SparkConnectPlanner(val session: SparkSession) {
   private def transformTypedCoGroupMap(
       rel: proto.CoGroupMap,
       commonUdf: proto.CommonInlineUserDefinedFunction): LogicalPlan = {
-    val udf = ScalaUdf(commonUdf)
+    val udf = TypedScalaUdf(commonUdf)
     val left = UntypedKeyValueGroupedDataset(
       rel.getInput,
       rel.getInputGroupingExpressionsList,
@@ -752,7 +752,7 @@ class SparkConnectPlanner(val session: SparkSession) {
   /**
    * The UDF used in typed APIs, where the input column is absent.
    */
-  private case class ScalaUdf(
+  private case class TypedScalaUdf(
       function: AnyRef,
       outEnc: ExpressionEncoder[_],
       outputObjAttr: Attribute,
@@ -763,8 +763,8 @@ class SparkConnectPlanner(val session: SparkSession) {
       UnresolvedDeserializer(inEnc.deserializer, inputAttributes)
     }
   }
-  private object ScalaUdf {
-    def apply(commonUdf: proto.CommonInlineUserDefinedFunction): ScalaUdf = {
+  private object TypedScalaUdf {
+    def apply(commonUdf: proto.CommonInlineUserDefinedFunction): TypedScalaUdf = {
       val udf = unpackUdf(commonUdf)
       val outEnc = ExpressionEncoder(udf.outputEncoder)
       // There might be more than one inputs, but we only interested in the first one.
@@ -773,7 +773,7 @@ class SparkConnectPlanner(val session: SparkSession) {
       // the first input which is the key of the grouping function.
       assert(udf.inputEncoders.nonEmpty)
       val inEnc = ExpressionEncoder(udf.inputEncoders.head) // single input encoder or key encoder
-      ScalaUdf(udf.function, outEnc, generateObjAttr(outEnc), inEnc, generateObjAttr(inEnc))
+      TypedScalaUdf(udf.function, outEnc, generateObjAttr(outEnc), inEnc, generateObjAttr(inEnc))
     }
   }
 
@@ -1197,7 +1197,7 @@ class SparkConnectPlanner(val session: SparkSession) {
   private def transformTypedFilter(
       fun: proto.CommonInlineUserDefinedFunction,
       child: LogicalPlan): TypedFilter = {
-    val udf = ScalaUdf(fun)
+    val udf = TypedScalaUdf(fun)
     TypedFilter(udf.function, child)(udf.inEnc)
   }
 
@@ -1622,7 +1622,7 @@ class SparkConnectPlanner(val session: SparkSession) {
           case expr
               if expr.hasCommonInlineUserDefinedFunction
                 && expr.getCommonInlineUserDefinedFunction.hasScalarScalaUdf =>
-            ScalaUdf(expr.getCommonInlineUserDefinedFunction)
+            TypedScalaUdf(expr.getCommonInlineUserDefinedFunction)
           case other =>
             throw InvalidPlanInput(s"reduce should be a scalar scala udf, but got $other")
         }
@@ -1940,7 +1940,7 @@ class SparkConnectPlanner(val session: SparkSession) {
         .expr
       Column(newExpr).named
     })
-    val keyColumn = UntypedAggUtils.aggKeyColumn(ds.kEncoder, ds.groupingAttributes)
+    val keyColumn = logical.UntypedAggUtils.aggKeyColumn(ds.kEncoder, ds.groupingAttributes)
     logical.Aggregate(ds.groupingAttributes, keyColumn +: namedColumns, ds.analyzed)
   }
 
