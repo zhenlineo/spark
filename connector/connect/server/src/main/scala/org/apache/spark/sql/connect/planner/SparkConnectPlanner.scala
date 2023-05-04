@@ -634,16 +634,18 @@ class SparkConnectPlanner(val session: SparkSession) {
   }
 
   /**
-   * This is the untyped version of [[KeyValueGroupedDataset]].
+   * This is the untyped version of [[org.apache.spark.sql.KeyValueGroupedDataset]].
    */
   private case class UntypedKeyValueGroupedDataset(
       kEncoder: ExpressionEncoder[_],
       vEncoder: ExpressionEncoder[_],
-      valueDeserializer: Expression,
       analyzed: LogicalPlan,
       dataAttributes: Seq[Attribute],
       groupingAttributes: Seq[Attribute],
-      sortOrder: Seq[SortOrder])
+      sortOrder: Seq[SortOrder]) {
+    val valueDeserializer: Expression =
+      UnresolvedDeserializer(vEncoder.deserializer, dataAttributes)
+  }
   private object UntypedKeyValueGroupedDataset {
     def apply(
         input: proto.Relation,
@@ -671,21 +673,16 @@ class SparkConnectPlanner(val session: SparkSession) {
         groupingExprs: java.util.List[proto.Expression],
         sortingExprs: java.util.List[proto.Expression]): UntypedKeyValueGroupedDataset = {
       assert(groupingExprs.size() >= 1)
-      val dummyFunc = unpackUdf(groupingExprs.get(0).getCommonInlineUserDefinedFunction)
+      val dummyFunc = TypedScalaUdf(groupingExprs.get(0))
       val groupExprs = groupingExprs.asScala.toSeq.drop(1).map(expr => transformExpression(expr))
-
-      val vEnc = ExpressionEncoder(dummyFunc.inputEncoders.head)
-      val kEnc = ExpressionEncoder(dummyFunc.outputEncoder)
 
       val (qe, aliasedGroupings) =
         RelationalGroupedDataset.handleGroupingExpression(logicalPlan, session, groupExprs)
 
       val dataAttributes = logicalPlan.output
-      val valueDeserializer = UnresolvedDeserializer(vEnc.deserializer, dataAttributes)
       UntypedKeyValueGroupedDataset(
-        kEnc,
-        vEnc,
-        valueDeserializer,
+        dummyFunc.outEnc,
+        dummyFunc.inEnc,
         qe.analyzed,
         dataAttributes,
         aliasedGroupings,
@@ -697,27 +694,13 @@ class SparkConnectPlanner(val session: SparkSession) {
         groupingExprs: java.util.List[proto.Expression],
         sortingExprs: java.util.List[proto.Expression]): UntypedKeyValueGroupedDataset = {
       assert(groupingExprs.size() == 1)
-      val groupFunc = groupingExprs.asScala.toSeq
-        .map(expr => unpackUdf(expr.getCommonInlineUserDefinedFunction))
-        .head
+      val groupFunc = TypedScalaUdf(groupingExprs.get(0))
+      val vEnc = groupFunc.inEnc
+      val kEnc = groupFunc.outEnc
 
-      assert(groupFunc.inputEncoders.size == 1)
-      val vEnc = ExpressionEncoder(groupFunc.inputEncoders.head)
-      val kEnc = ExpressionEncoder(groupFunc.outputEncoder)
-
-      val withGroupingKey = new AppendColumns(
-        groupFunc.function.asInstanceOf[Any => Any],
-        vEnc.clsTag.runtimeClass,
-        vEnc.schema,
-        UnresolvedDeserializer(vEnc.deserializer),
-        kEnc.namedExpressions,
-        logicalPlan)
-
+      val withGroupingKey = AppendColumns(groupFunc.function, vEnc, kEnc, logicalPlan)
       // The input logical plan of KeyValueGroupedDataset need to be executed and analyzed
       val analyzed = session.sessionState.executePlan(withGroupingKey).analyzed
-      val dataAttributes = logicalPlan.output
-      val groupingAttributes = withGroupingKey.newColumns
-      val valueDeserializer = UnresolvedDeserializer(vEnc.deserializer, dataAttributes)
 
       // Compute sort order
       val sortExprs =
@@ -727,10 +710,9 @@ class SparkConnectPlanner(val session: SparkSession) {
       UntypedKeyValueGroupedDataset(
         kEnc,
         vEnc,
-        valueDeserializer,
         analyzed,
-        dataAttributes,
-        groupingAttributes,
+        logicalPlan.output,
+        withGroupingKey.newColumns,
         sortOrder)
     }
   }
@@ -750,6 +732,15 @@ class SparkConnectPlanner(val session: SparkSession) {
     }
   }
   private object TypedScalaUdf {
+    def apply(expr: proto.Expression): TypedScalaUdf = {
+      if (expr.hasCommonInlineUserDefinedFunction
+        && expr.getCommonInlineUserDefinedFunction.hasScalarScalaUdf) {
+        apply(expr.getCommonInlineUserDefinedFunction)
+      } else {
+        throw InvalidPlanInput(s"Expecting a Scala UDF, but get ${expr.getExprTypeCase}")
+      }
+    }
+
     def apply(commonUdf: proto.CommonInlineUserDefinedFunction): TypedScalaUdf = {
       val udf = unpackUdf(commonUdf)
       val outEnc = ExpressionEncoder(udf.outputEncoder)
@@ -1870,16 +1861,48 @@ class SparkConnectPlanner(val session: SparkSession) {
     output.logicalPlan
   }
 
+  private def transformMapValuesFunc(
+      fun: proto.Expression.UnresolvedFunction): (TypedScalaUdf, Seq[Expression]) = {
+    if (fun.getArgumentsCount <= 1) {
+      throw InvalidPlanInput("map_values requires at least two child expressions")
+    }
+    val args = fun.getArgumentsList.asScala.toSeq
+    (TypedScalaUdf(args.head), args.drop(1).map(transformExpression))
+  }
+
   def transformKeyValueGroupedAggregate(rel: proto.Aggregate): LogicalPlan = {
-    val ds = UntypedKeyValueGroupedDataset(
+    var ds = UntypedKeyValueGroupedDataset(
       rel.getInput,
       rel.getGroupingExpressionsList,
       java.util.Collections.emptyList())
 
-    val namedColumns = rel.getAggregateExpressionsList.asScala.toSeq.map(expr => {
+    val aggExprs: Seq[Expression] = rel.getAggregateExpressionsList.asScala.toSeq match {
+      case Seq(expr)
+          if expr.hasUnresolvedFunction &&
+            expr.getUnresolvedFunction.getFunctionName == "map_values" =>
+        val (mapFunc, exprs) = transformMapValuesFunc(expr.getUnresolvedFunction)
+        // Recompute the dataset's logical plan and data attributes after applying the mapFunc.
+        val withNewData = AppendColumns(
+          mapFunc.function,
+          mapFunc.inEnc,
+          mapFunc.outEnc,
+          ds.analyzed,
+          ds.dataAttributes)
+
+        val projected = Project(withNewData.newColumns ++ ds.groupingAttributes, withNewData)
+        val analyzed = session.sessionState.executePlan(projected).analyzed
+        ds = ds.copy(
+          vEncoder = mapFunc.outEnc,
+          analyzed = analyzed,
+          dataAttributes = withNewData.newColumns)
+        exprs
+      case exprs =>
+        exprs.map(transformExpression)
+    }
+    val namedColumns = aggExprs.map(expr => {
       // Use any encoder as a placeholder to perform the TypedColumn#withInputType transformation
       val any = ds.vEncoder
-      val newExpr = new TypedColumn(transformExpression(expr), any)
+      val newExpr = new TypedColumn(expr, any)
         .withInputType(ds.vEncoder, ds.dataAttributes)
         .expr
       Column(newExpr).named
