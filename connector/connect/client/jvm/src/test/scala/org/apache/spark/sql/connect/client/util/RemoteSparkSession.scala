@@ -99,20 +99,6 @@ object SparkConnectServerUtils {
         .map(clientTestJar => Seq("--jars", clientTestJar.getCanonicalPath))
         .getOrElse(Seq.empty)
 
-    // For UDF maven E2E tests, the server needs the client code to find the UDFs defined in tests.
-    val connectClientTestJar = tryFindJar(
-      "connector/connect/client/jvm",
-      // SBT passes the client & test jars to the server process automatically.
-      // So we skip building or finding this jar for SBT.
-      "sbt-tests-do-not-need-this-jar",
-      "spark-connect-client-jvm",
-      test = true)
-      .map(clientTestJar => Seq(clientTestJar.getCanonicalPath))
-      .getOrElse(Seq.empty)
-
-    val allJars = catalystTestJar ++ connectClientTestJar
-    val jarsConfigs = Seq("--jars", allJars.mkString(","))
-
     // Use InMemoryTableCatalog for V2 writer tests
     val writerV2Configs = Seq(
       "--conf",
@@ -139,7 +125,7 @@ object SparkConnectServerUtils {
       Seq("--conf", s"spark.sql.catalogImplementation=$catalogImplementation")
     }
 
-    jarsConfigs ++ writerV2Configs ++ hiveTestConfigs
+    catalystTestJar ++ writerV2Configs ++ hiveTestConfigs
   }
 
   def start(): Unit = {
@@ -210,6 +196,16 @@ trait RemoteSparkSession extends ConnectFunSuite with BeforeAndAfterAll {
         debug(error)
         throw error
       }
+
+      // For UDF maven E2E tests, the server needs the client code to find the UDFs defined in tests.
+      val connectClientTestJar = tryFindJar(
+        "connector/connect/client/jvm",
+        // SBT passes the client & test jars to the server process automatically.
+        // So we skip building or finding this jar for SBT.
+        "sbt-tests-do-not-need-this-jar",
+        "spark-connect-client-jvm",
+        test = true
+      ).map(clientTestJar => spark.addArtifact(clientTestJar.toURI))
     }
   }
 
