@@ -96,8 +96,22 @@ object SparkConnectServerUtils {
     // To find InMemoryTableCatalog for V2 writer tests
     val catalystTestJar =
       tryFindJar("sql/catalyst", "spark-catalyst", "spark-catalyst", test = true)
-        .map(jar => Seq("--jars", jar.getCanonicalPath))
+        .map(clientTestJar => Seq(clientTestJar.getCanonicalPath))
         .getOrElse(Seq.empty)
+
+    // For UDF maven E2E tests, the server needs the client code to find the UDFs defined in tests.
+    val connectClientTestJar = tryFindJar(
+      "connector/connect/client/jvm",
+      // SBT passes the client & test jars to the server process automatically.
+      // So we skip building or finding this jar for SBT.
+      "sbt-tests-do-not-need-this-jar",
+      "spark-connect-client-jvm",
+      test = true)
+      .map(clientTestJar => Seq(clientTestJar.getCanonicalPath))
+      .getOrElse(Seq.empty)
+
+    val allJars = catalystTestJar
+    val jarsConfigs = Seq("--jars", allJars.mkString(","))
 
     // Use InMemoryTableCatalog for V2 writer tests
     val writerV2Configs = Seq(
@@ -125,7 +139,12 @@ object SparkConnectServerUtils {
       Seq("--conf", s"spark.sql.catalogImplementation=$catalogImplementation")
     }
 
-    catalystTestJar ++ writerV2Configs ++ hiveTestConfigs
+    val udfStubTestConfigs = Seq(
+      "--conf",
+      "spark.connect.scalaUdf.stubClasses=" +
+        "org.apache.spark.sql.connect.client, org.apache.spark.sql.connect")
+
+    jarsConfigs ++ writerV2Configs ++ hiveTestConfigs ++ udfStubTestConfigs
   }
 
   def start(): Unit = {
